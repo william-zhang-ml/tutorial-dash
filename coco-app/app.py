@@ -6,12 +6,12 @@ An application to teach me the following skills that are good to know.
 - switch the image from a dropdown menu
 - switch the image randomly from a button press
 """
-import base64
-from io import BytesIO
 import logging
+import random
 from dash import Dash, html, dcc, callback, Input, Output, no_update
 import hydra
 from omegaconf import DictConfig
+from PIL.Image import Image
 from torchvision.datasets import CocoDetection
 
 
@@ -40,6 +40,7 @@ def launch_app(cfg: DictConfig) -> None:
             0,
             id='img-selection'
         ),
+        html.Button('Random', id='randomizer'),
         html.Img(src=img, id='img')
     ])
 
@@ -51,20 +52,37 @@ def launch_app(cfg: DictConfig) -> None:
     Output('img', 'src'),
     Input('img-selection', 'value')
 )
-def update_graph(idx: int) -> None:
-    """Load specific img from dataset.
+def update_image(idx: int) -> Image:
+    """Load specific image from dataset.
 
     Args:
         idx (int): which image
 
     Returns:
-        PIL.Image.Image: idx-th image
+        Image: idx-th image
     """
     if idx is None:
         return no_update
 
     global dataset
-    img, _ = dataset[int(idx)]
+    img, _ = dataset[idx]
+    return img
+
+
+# Button callback
+@app.callback(
+    Output('img', 'src'),
+    Input('randomizer', 'n_clicks')
+)
+def randomize_image(_) -> Image:
+    """Load random image from dataset.
+
+    Returns:
+        Image: random image
+    """
+    global dataset
+    idx = random.randint(0, len(dataset) - 1)
+    img, _ = dataset[idx]
     return img
 
 
