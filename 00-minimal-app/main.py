@@ -12,7 +12,7 @@ df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/gapmi
 app = Dash()
 
 # Define the front-end layout, requires Dash 2.17.0 or later
-app.layout = [
+app.layout = html.Div([
     html.H1(
         children='Title of Dash App',
         style={'textAlign': 'center'}
@@ -23,7 +23,7 @@ app.layout = [
         id='dropdown-selection'
     ),                             # dropdown options, default, HTML ID
     dcc.Graph(id='graph-content')  # graph
-]
+])
 
 
 # Dropdown menu callback
