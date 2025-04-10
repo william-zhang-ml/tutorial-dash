@@ -52,13 +52,13 @@ def launch_app(cfg: DictConfig) -> None:
     Input('img-selection', 'value')
 )
 def update_graph(idx: int) -> None:
-    """Extract population data for a specific country.
+    """Load specific img from dataset.
 
     Args:
-        value (str): country of interest
+        idx (int): which image
 
     Returns:
-        px.line: population versus year data
+        PIL.Image.Image: idx-th image
     """
     if idx is None:
         return no_update
