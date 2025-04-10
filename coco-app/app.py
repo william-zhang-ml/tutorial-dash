@@ -47,6 +47,20 @@ def launch_app(cfg: DictConfig) -> None:
     app.run(debug=True)
 
 
+def get_image(idx: int) -> Image:
+    """Load specific image from dataset (backend).
+
+    Args:
+        idx (int): which image
+
+    Returns:
+        Image: idx-th image
+    """
+    global dataset
+    img, _ = dataset[idx]
+    return img
+
+
 # Dropdown menu callback
 @callback(
     Output('img', 'src'),
@@ -63,10 +77,7 @@ def update_image(idx: int) -> Image:
     """
     if idx is None:
         return no_update
-
-    global dataset
-    img, _ = dataset[idx]
-    return img
+    return get_image(idx)
 
 
 # Button callback
@@ -82,8 +93,7 @@ def randomize_image(_) -> Image:
     """
     global dataset
     idx = random.randint(0, len(dataset) - 1)
-    img, _ = dataset[idx]
-    return img
+    return get_image(idx)
 
 
 if __name__ == '__main__':
