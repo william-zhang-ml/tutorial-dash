@@ -12,6 +12,7 @@ from dash import Dash, html, dcc, callback, Input, Output, no_update
 import hydra
 from omegaconf import DictConfig
 from PIL.Image import Image
+from PIL.ImageDraw import Draw
 from torchvision.datasets import CocoDetection
 
 
@@ -57,7 +58,14 @@ def get_image(idx: int) -> Image:
         Image: idx-th image
     """
     global dataset
-    img, _ = dataset[idx]
+    img, target = dataset[idx]
+    draw = Draw(img)
+    for instance in target:
+        box_x, box_y, box_w, box_h = instance['bbox']
+        draw.rectangle(
+            [(box_x, box_y), (box_x + box_w, box_y + box_h)],
+            outline='magenta',
+        )
     return img
 
 
