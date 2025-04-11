@@ -25,6 +25,7 @@ IMAGE_ID = 'img'
 
 app = Dash()
 dataset = None
+curr_idx, curr_img, curr_annots = None, None, None
 
 
 @hydra.main(version_base=None, config_path='.', config_name='default')
@@ -34,12 +35,13 @@ def launch_app(cfg: DictConfig) -> None:
     Args:
         cfg (DictConfig): app configuration
     """
-    global dataset
+    global dataset, curr_idx, curr_img, curr_annots
     dataset = CocoDetection(
         root=cfg.image_path,
         annFile=cfg.annot_path
     )
-    img, _ = dataset[0]  # img is PIL
+    curr_idx = 0
+    curr_img, curr_annots = dataset[curr_idx]  # img is PIL
 
     # dashboard structure
     app.layout = html.Div([
@@ -50,13 +52,13 @@ def launch_app(cfg: DictConfig) -> None:
         ),
         html.Button('Random', id=BUTTON_ID),
         dcc.Checklist(options=['boxes'], id=CHECK_ID),
-        html.Img(src=img, id=IMAGE_ID)
+        html.Img(src=curr_img, id=IMAGE_ID)
     ])
 
     app.run(debug=True)
 
 
-def get_image(idx: int, show_boxes: bool = True) -> Image:
+def get_image(show_boxes: bool = True) -> Image:
     """Load specific image from dataset.
 
     Args:
@@ -66,11 +68,11 @@ def get_image(idx: int, show_boxes: bool = True) -> Image:
     Returns:
         Image: idx-th image
     """
-    global dataset
-    img, target = dataset[idx]
+    global dataset, curr_idx, curr_img, curr_annots
+    img = curr_img.copy()
     if show_boxes:
         draw = Draw(img)
-        for instance in target:
+        for instance in curr_annots:
             box_x, box_y, box_w, box_h = instance['bbox']
             draw.rectangle(
                 [(box_x, box_y), (box_x + box_w, box_y + box_h)],
@@ -88,25 +90,28 @@ def get_image(idx: int, show_boxes: bool = True) -> Image:
         Input(CHECK_ID, 'value')
     ]
 )
-def randomize_image(idx: int, n_clicks: int, checked: str) -> Image:
+def update_datastate(idx: int, n_clicks: int, checked: str) -> Image:
     """Load random image from dataset.
 
     Returns:
         Image: random image
     """
-    global dataset
+    global dataset, curr_idx, curr_img, curr_annots
+    if ctx.triggered_id == CHECK_ID:
+        return get_image(checked is not None and 'boxes' in checked)
+
     if ctx.triggered_id == DROPDOWN_ID:
         if idx is None:
             return no_update
     elif ctx.triggered_id == BUTTON_ID:
         idx = random.randint(0, len(dataset) - 1)
-    elif ctx.triggered_id == CHECK_ID:
-        pass
 
-    return get_image(
-        idx,
-        checked is not None and 'boxes' in checked
-    )
+    if idx == curr_idx:
+        return no_update
+
+    curr_idx = idx
+    curr_img, curr_annots = dataset[idx]
+    return get_image(checked is not None and 'boxes' in checked)
 
 
 if __name__ == '__main__':
