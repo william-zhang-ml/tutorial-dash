@@ -8,12 +8,17 @@ An application to teach me the following skills that are good to know.
 """
 import logging
 import random
-from dash import Dash, html, dcc, callback, Input, Output, no_update
+from dash import Dash, html, dcc, callback, Input, Output, no_update, ctx
 import hydra
 from omegaconf import DictConfig
 from PIL.Image import Image
 from PIL.ImageDraw import Draw
 from torchvision.datasets import CocoDetection
+
+
+DROPDOWN_ID = 'selector'
+BUTTON_ID = 'randomizer'
+IMAGE_ID = 'img'
 
 
 app = Dash()
@@ -39,17 +44,17 @@ def launch_app(cfg: DictConfig) -> None:
         dcc.Dropdown(
             list(range(cfg.num_dropdown)),
             0,
-            id='img-selection'
+            id=DROPDOWN_ID
         ),
-        html.Button('Random', id='randomizer'),
-        html.Img(src=img, id='img')
+        html.Button('Random', id=BUTTON_ID),
+        html.Img(src=img, id=IMAGE_ID)
     ])
 
     app.run(debug=True)
 
 
 def get_image(idx: int) -> Image:
-    """Load specific image from dataset (backend).
+    """Load specific image from dataset.
 
     Args:
         idx (int): which image
@@ -69,38 +74,24 @@ def get_image(idx: int) -> Image:
     return img
 
 
-# Dropdown menu callback
-@callback(
-    Output('img', 'src'),
-    Input('img-selection', 'value')
-)
-def update_image(idx: int) -> Image:
-    """Load specific image from dataset.
-
-    Args:
-        idx (int): which image
-
-    Returns:
-        Image: idx-th image
-    """
-    if idx is None:
-        return no_update
-    return get_image(idx)
-
-
-# Button callback
+# Callback to update image display
 @app.callback(
     Output('img', 'src'),
-    Input('randomizer', 'n_clicks')
+    [Input(DROPDOWN_ID, 'value'), Input(BUTTON_ID, 'n_clicks')]
 )
-def randomize_image(_) -> Image:
+def randomize_image(idx: int, n_clicks: int) -> Image:
     """Load random image from dataset.
 
     Returns:
         Image: random image
     """
     global dataset
-    idx = random.randint(0, len(dataset) - 1)
+    if ctx.triggered_id == DROPDOWN_ID:
+        if idx is None:
+            return no_update
+    elif ctx.triggered_id == BUTTON_ID:
+        idx = random.randint(0, len(dataset) - 1)
+
     return get_image(idx)
 
 
