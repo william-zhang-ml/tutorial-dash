@@ -17,7 +17,7 @@ app.layout = dbc.Container([
     dbc.Label('Click a cell in the table:'),
     dash_table.DataTable(
         df.to_dict('records'),
-        [{"name": i, "id": i} for i in df.columns],
+        [{"name": col, "id": col} for col in df.columns],
         id='tbl'
     ),
     dbc.Alert(id='tbl_out'),
