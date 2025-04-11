@@ -5,6 +5,7 @@ An application to teach me the following skills that are good to know.
 - annotate the image with bounding boxes and text
 - switch the image from a dropdown menu
 - switch the image randomly from a button press
+- toggle bounding boxes on and off
 """
 import logging
 import random
@@ -18,6 +19,7 @@ from torchvision.datasets import CocoDetection
 
 DROPDOWN_ID = 'selector'
 BUTTON_ID = 'randomizer'
+CHECK_ID = 'annot-check'
 IMAGE_ID = 'img'
 
 
@@ -47,39 +49,46 @@ def launch_app(cfg: DictConfig) -> None:
             id=DROPDOWN_ID
         ),
         html.Button('Random', id=BUTTON_ID),
+        dcc.Checklist(options=['boxes'], id=CHECK_ID),
         html.Img(src=img, id=IMAGE_ID)
     ])
 
     app.run(debug=True)
 
 
-def get_image(idx: int) -> Image:
+def get_image(idx: int, show_boxes: bool = True) -> Image:
     """Load specific image from dataset.
 
     Args:
         idx (int): which image
+        show_boxes (bool): whether to draw bounding boxes
 
     Returns:
         Image: idx-th image
     """
     global dataset
     img, target = dataset[idx]
-    draw = Draw(img)
-    for instance in target:
-        box_x, box_y, box_w, box_h = instance['bbox']
-        draw.rectangle(
-            [(box_x, box_y), (box_x + box_w, box_y + box_h)],
-            outline='magenta',
-        )
+    if show_boxes:
+        draw = Draw(img)
+        for instance in target:
+            box_x, box_y, box_w, box_h = instance['bbox']
+            draw.rectangle(
+                [(box_x, box_y), (box_x + box_w, box_y + box_h)],
+                outline='magenta',
+            )
     return img
 
 
 # Callback to update image display
 @app.callback(
     Output('img', 'src'),
-    [Input(DROPDOWN_ID, 'value'), Input(BUTTON_ID, 'n_clicks')]
+    [
+        Input(DROPDOWN_ID, 'value'),
+        Input(BUTTON_ID, 'n_clicks'),
+        Input(CHECK_ID, 'value')
+    ]
 )
-def randomize_image(idx: int, n_clicks: int) -> Image:
+def randomize_image(idx: int, n_clicks: int, checked: str) -> Image:
     """Load random image from dataset.
 
     Returns:
@@ -91,8 +100,13 @@ def randomize_image(idx: int, n_clicks: int) -> Image:
             return no_update
     elif ctx.triggered_id == BUTTON_ID:
         idx = random.randint(0, len(dataset) - 1)
+    elif ctx.triggered_id == CHECK_ID:
+        pass
 
-    return get_image(idx)
+    return get_image(
+        idx,
+        checked is not None and 'boxes' in checked
+    )
 
 
 if __name__ == '__main__':
