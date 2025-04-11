@@ -9,7 +9,8 @@ An application to teach me the following skills that are good to know.
 """
 import logging
 import random
-from dash import Dash, html, dcc, callback, Input, Output, no_update, ctx
+from dash import Dash, html, dcc, Input, Output, no_update, ctx
+import dash_bootstrap_components as dbc
 import hydra
 from omegaconf import DictConfig
 from PIL.Image import Image
@@ -23,7 +24,7 @@ CHECK_ID = 'annot-check'
 IMAGE_ID = 'img'
 
 
-app = Dash()
+app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 dataset = None
 curr_idx, curr_img, curr_annots = None, None, None
 
@@ -50,7 +51,7 @@ def launch_app(cfg: DictConfig) -> None:
             curr_idx,
             id=DROPDOWN_ID
         ),
-        html.Button('Random', id=BUTTON_ID),
+        dbc.Button('Random', color='primary', id=BUTTON_ID),
         dcc.Checklist(options=['boxes'], id=CHECK_ID),
         html.Img(src=curr_img, id=IMAGE_ID)
     ])
