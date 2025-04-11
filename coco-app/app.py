@@ -47,7 +47,7 @@ def launch_app(cfg: DictConfig) -> None:
     app.layout = html.Div([
         dcc.Dropdown(
             list(range(cfg.num_dropdown)),
-            0,
+            curr_idx,
             id=DROPDOWN_ID
         ),
         html.Button('Random', id=BUTTON_ID),
@@ -83,7 +83,10 @@ def get_image(show_boxes: bool = True) -> Image:
 
 # Callback to update image display
 @app.callback(
-    Output('img', 'src'),
+    [
+        Output(IMAGE_ID, 'src'),
+        Output(DROPDOWN_ID, 'value'),
+    ],
     [
         Input(DROPDOWN_ID, 'value'),
         Input(BUTTON_ID, 'n_clicks'),
@@ -98,7 +101,7 @@ def update_datastate(idx: int, n_clicks: int, checked: str) -> Image:
     """
     global dataset, curr_idx, curr_img, curr_annots
     if ctx.triggered_id == CHECK_ID:
-        return get_image(checked is not None and 'boxes' in checked)
+        return get_image(checked is not None and 'boxes' in checked), idx
 
     if ctx.triggered_id == DROPDOWN_ID:
         if idx is None:
@@ -107,11 +110,12 @@ def update_datastate(idx: int, n_clicks: int, checked: str) -> Image:
         idx = random.randint(0, len(dataset) - 1)
 
     if idx == curr_idx:
-        return no_update
+        return no_update, idx
 
+    # only runs when need to present user a different image
     curr_idx = idx
     curr_img, curr_annots = dataset[idx]
-    return get_image(checked is not None and 'boxes' in checked)
+    return get_image(checked is not None and 'boxes' in checked), idx
 
 
 if __name__ == '__main__':
