@@ -48,21 +48,95 @@ def launch_app(cfg: DictConfig) -> None:
     sample_data = pack_table()
 
     # dashboard structure
-    app.layout = html.Div([
-        dcc.Dropdown(
-            list(range(cfg.num_dropdown)),
-            curr_idx,
-            id=DROPDOWN_ID
-        ),
-        dbc.Button('Random', color='primary', id=BUTTON_ID),
-        dcc.Checklist(options=['boxes'], id=CHECK_ID),
-        html.Img(src=curr_img, id=IMAGE_ID),
-        dash_table.DataTable(
-            sample_data.to_dict('records'),
-            [{"name": col, "id": col} for col in sample_data.columns],
-            id=TABLE_ID
-        )
-    ])
+    app.layout = dbc.Row(
+        [
+            html.Div(
+                [
+                    dbc.Row(
+                        html.Img(
+                            src=curr_img,
+                            id=IMAGE_ID,
+                            style={
+                                'max-height': '100%',
+                                'max-width': '100%',
+                                'height': 'auto',
+                                'width': 'auto',
+                                'object-fit': 'contain'
+                            }
+                        ),
+                        style={
+                            'height': '648px',
+                            'width': '100%',
+                            'padding': 0,
+                            'border': '2px solid black',
+                            'display': 'flex',
+                            'align-items': 'center',
+                            'justify-content': 'center'
+                        }
+                    ),
+                    dbc.Row(
+                        [
+                            dcc.Dropdown(
+                                list(range(cfg.num_dropdown)),
+                                curr_idx,
+                                id=DROPDOWN_ID,
+                                style={'width': '16rem'}
+                            ),
+                            dbc.Button(
+                                'Random',
+                                color='primary', 
+                                id=BUTTON_ID,
+                                style={'width': '8rem'}
+                            ),
+                            dcc.Checklist(
+                                options=['boxes'],
+                                id=CHECK_ID,
+                                style={'width': 'auto'}
+                            ),
+                        ],
+                        style={
+                            'width': '100%',
+                            'padding': '1rem',
+                            'display': 'flex',
+                            'align-items': 'center',
+                            'justify-content': 'space-evenly'
+                        }
+                    )
+                ],
+                id='left-col',
+                style={
+                    'width': '648px',
+                    'margin': '1rem',
+                    'padding': 0,
+                    'display': 'flex',
+                    'flex-direction': 'column',
+                    'justify-content': 'center',
+                    'align-items': 'center'
+                }
+            ),
+            html.Div(
+                dash_table.DataTable(
+                    sample_data.to_dict('records'),
+                    [{"name": col, "id": col} for col in sample_data.columns],
+                    id=TABLE_ID
+                ),
+                id='right-col',
+                style={
+                    'max-width': '30%',
+                    'margin': '1rem'
+                }
+            ),
+        ],
+        style={
+            'background': '#eeeeee',
+            'height': '100vh',
+            'margin': 0,
+            'padding': 0,
+            'display': 'flex',
+            'justify-content': 'center',
+            'align-items': 'center'
+        },
+    )
 
     app.run(debug=True)
 
