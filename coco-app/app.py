@@ -9,10 +9,11 @@ An application to teach me the following skills that are good to know.
 """
 import logging
 import random
-from dash import Dash, html, dcc, Input, Output, no_update, ctx
+from dash import Dash, html, dcc, Input, Output, no_update, ctx, dash_table
 import dash_bootstrap_components as dbc
 import hydra
 from omegaconf import DictConfig
+import pandas as pd
 from PIL.Image import Image
 from PIL.ImageDraw import Draw
 from torchvision.datasets import CocoDetection
@@ -22,6 +23,7 @@ DROPDOWN_ID = 'selector'
 BUTTON_ID = 'randomizer'
 CHECK_ID = 'annot-check'
 IMAGE_ID = 'img'
+TABLE_ID = 'table'
 
 
 app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -43,6 +45,7 @@ def launch_app(cfg: DictConfig) -> None:
     )
     curr_idx = 0
     curr_img, curr_annots = dataset[curr_idx]  # img is PIL
+    sample_data = pack_table()
 
     # dashboard structure
     app.layout = html.Div([
@@ -53,10 +56,34 @@ def launch_app(cfg: DictConfig) -> None:
         ),
         dbc.Button('Random', color='primary', id=BUTTON_ID),
         dcc.Checklist(options=['boxes'], id=CHECK_ID),
-        html.Img(src=curr_img, id=IMAGE_ID)
+        html.Img(src=curr_img, id=IMAGE_ID),
+        dash_table.DataTable(
+            sample_data.to_dict('records'),
+            [{"name": col, "id": col} for col in sample_data.columns],
+            id=TABLE_ID
+        )
     ])
 
     app.run(debug=True)
+
+
+def pack_table() -> pd.DataFrame:
+    """_summary_
+
+    Returns:
+        pd.DataFrame: _description_
+    """
+    global dataset, curr_idx, curr_img, curr_annots
+    records = [
+        {'Field': 'image shape', 'Value': str(curr_img.size)},
+        {'Field': 'num boxes', 'Value': len(curr_annots)}
+    ]
+    for instance in curr_annots:
+        records.append({
+            'Field': 'box',
+            'Value': f'{instance["bbox"]}, {instance["category_id"]}'
+        })
+    return pd.DataFrame.from_records(records)
 
 
 def get_image(show_boxes: bool = True) -> Image:
@@ -87,6 +114,7 @@ def get_image(show_boxes: bool = True) -> Image:
     [
         Output(IMAGE_ID, 'src'),
         Output(DROPDOWN_ID, 'value'),
+        Output(TABLE_ID, 'data')
     ],
     [
         Input(DROPDOWN_ID, 'value'),
@@ -102,7 +130,7 @@ def update_datastate(idx: int, n_clicks: int, checked: str) -> Image:
     """
     global dataset, curr_idx, curr_img, curr_annots
     if ctx.triggered_id == CHECK_ID:
-        return get_image(checked is not None and 'boxes' in checked), idx
+        return get_image(checked is not None and 'boxes' in checked), no_update, no_update
 
     if ctx.triggered_id == DROPDOWN_ID:
         if idx is None:
@@ -111,12 +139,12 @@ def update_datastate(idx: int, n_clicks: int, checked: str) -> Image:
         idx = random.randint(0, len(dataset) - 1)
 
     if idx == curr_idx:
-        return no_update, idx
+        return no_update, no_update, no_update
 
     # only runs when need to present user a different image
     curr_idx = idx
     curr_img, curr_annots = dataset[idx]
-    return get_image(checked is not None and 'boxes' in checked), idx
+    return get_image(checked is not None and 'boxes' in checked), idx, pack_table().to_dict('records')
 
 
 if __name__ == '__main__':
