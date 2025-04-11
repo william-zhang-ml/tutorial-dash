@@ -29,7 +29,15 @@ app.layout = dbc.Container([
     Output('tbl_out', 'children'),
     Input('tbl', 'active_cell')
 )
-def update_graphs(active_cell):
+def update_graphs(active_cell: dict) -> str:
+    """Change the alert message.
+
+    Args:
+        active_cell (dict): cell metadata
+
+    Returns:
+        str: new alert text
+    """
     return str(active_cell) if active_cell else "Click the table"
 
 
