@@ -105,12 +105,13 @@ def launch_app(cfg: DictConfig) -> None:
                 ],
                 id='left-col',
                 style={
+                    'height': '100%',
                     'width': '648px',
                     'margin': '1rem',
-                    'padding': 0,
+                    'padding-top': '4%',
                     'display': 'flex',
                     'flex-direction': 'column',
-                    'justify-content': 'center',
+                    'justify-content': 'flex-start',
                     'align-items': 'center'
                 }
             ),
@@ -122,8 +123,10 @@ def launch_app(cfg: DictConfig) -> None:
                 ),
                 id='right-col',
                 style={
+                    'height': '100%',
                     'max-width': '30%',
-                    'margin': '1rem'
+                    'margin': '1rem',
+                    'padding-top': '4%'
                 }
             ),
         ],
