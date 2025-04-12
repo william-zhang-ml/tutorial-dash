@@ -7,9 +7,10 @@ An application to teach me the following skills that are good to know.
 - switch the image randomly from a button press
 - toggle bounding boxes on and off
 """
+from ast import literal_eval
 import logging
 import random
-from dash import Dash, html, dcc, Input, Output, no_update, ctx, dash_table
+from dash import Dash, html, dcc, Input, Output, State, no_update, ctx, dash_table
 import dash_bootstrap_components as dbc
 import hydra
 from omegaconf import DictConfig
@@ -19,6 +20,7 @@ from PIL.ImageDraw import Draw
 from torchvision.datasets import CocoDetection
 
 
+STORE_ID = 'store'
 DROPDOWN_ID = 'selector'
 BUTTON_ID = 'randomizer'
 CHECK_ID = 'annot-check'
@@ -29,6 +31,7 @@ TABLE_ID = 'table'
 app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 dataset = None
 curr_idx, curr_img, curr_annots = None, None, None
+highlight = None
 
 
 @hydra.main(version_base=None, config_path='.', config_name='default')
@@ -127,6 +130,7 @@ def launch_app(cfg: DictConfig) -> None:
                     'padding-top': '4%'
                 }
             ),
+            dcc.Store(STORE_ID)
         ],
         style={
             'background': '#eeeeee',
@@ -171,7 +175,7 @@ def get_image(show_boxes: bool = True) -> Image:
     Returns:
         Image: idx-th image
     """
-    global dataset, curr_idx, curr_img, curr_annots
+    global dataset, curr_idx, curr_img, curr_annots, highlight
     img = curr_img.copy()
     if show_boxes:
         draw = Draw(img)
@@ -179,7 +183,13 @@ def get_image(show_boxes: bool = True) -> Image:
             box_x, box_y, box_w, box_h = instance['bbox']
             draw.rectangle(
                 [(box_x, box_y), (box_x + box_w, box_y + box_h)],
-                outline='magenta',
+                outline='magenta'
+            )
+        if highlight is not None:
+            box_x, box_y, box_w, box_h = highlight
+            draw.rectangle(
+                [(box_x, box_y), (box_x + box_w, box_y + box_h)],
+                outline='cyan'
             )
     return img
 
@@ -194,10 +204,11 @@ def get_image(show_boxes: bool = True) -> Image:
     [
         Input(DROPDOWN_ID, 'value'),
         Input(BUTTON_ID, 'n_clicks'),
-        Input(CHECK_ID, 'value')
+        Input(CHECK_ID, 'value'),
+        Input(STORE_ID, 'data')
     ]
 )
-def update_datastate(idx: int, n_clicks: int, checked: str) -> Image:
+def update_datastate(idx: int, n_clicks: int, checked: str, store_data) -> Image:
     """Load random image from dataset.
 
     Returns:
@@ -225,14 +236,16 @@ def update_datastate(idx: int, n_clicks: int, checked: str) -> Image:
 @app.callback(
     [
         Output(TABLE_ID, 'style_data_conditional'),
-        Output(TABLE_ID, 'selected_cells')
+        Output(TABLE_ID, 'selected_cells'),
+        Output(STORE_ID, 'data')
     ],
     [
         Input(TABLE_ID, 'active_cell'),
         Input(TABLE_ID, 'selected_cells')
-    ]
+    ],
+    State(TABLE_ID, 'data')
 )
-def update_graphs(active_cell, selected_cells):
+def update_graphs(active_cell, selected_cells, table_data):
     if active_cell is None:
         return no_update  # Dash will run callbacks on launch
 
@@ -256,8 +269,12 @@ def update_graphs(active_cell, selected_cells):
         }
     ]
 
+    global highlight
+    highlight = table_data[active_cell['row']]['Value']
+    highlight = literal_eval(highlight.rsplit(',', 1)[0])
+
     # setting 'selected_cells' to [] spoofs disabling shift-clicks
-    return style, []
+    return style, [], highlight
 
 
 if __name__ == '__main__':
