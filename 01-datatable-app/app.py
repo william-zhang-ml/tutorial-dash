@@ -1,5 +1,6 @@
 """
 Example from https://dash.plotly.com/datatable.
+DataTable documentation: https://dash.plotly.com/datatable/reference.
 """
 from dash import Dash, Input, Output, dash_table
 import pandas as pd
