@@ -107,7 +107,6 @@ def launch_app(cfg: DictConfig) -> None:
                 style={
                     'height': '100%',
                     'width': '648px',
-                    'margin': '1rem',
                     'padding-top': '4%',
                     'display': 'flex',
                     'flex-direction': 'column',
@@ -119,13 +118,13 @@ def launch_app(cfg: DictConfig) -> None:
                 dash_table.DataTable(
                     sample_data.to_dict('records'),
                     [{"name": col, "id": col} for col in sample_data.columns],
+                    active_cell=None,
                     id=TABLE_ID
                 ),
                 id='right-col',
                 style={
                     'height': '100%',
                     'max-width': '30%',
-                    'margin': '1rem',
                     'padding-top': '4%'
                 }
             ),
@@ -222,6 +221,35 @@ def update_datastate(idx: int, n_clicks: int, checked: str) -> Image:
     curr_idx = idx
     curr_img, curr_annots = dataset[idx]
     return get_image(checked is not None and 'boxes' in checked), idx, pack_table().to_dict('records')
+
+
+@app.callback(
+    Output(TABLE_ID, 'style_data_conditional'),
+    Input(TABLE_ID, 'active_cell')
+)
+def update_graphs(active_cell):
+    if active_cell is None:
+        return no_update  # Dash will run callbacks on launch
+
+    # first condition disables default cell highlighting
+    # second condition highlights the row
+    color = '#4682b4'
+    return [
+        {
+            "if": {"state": "selected"},
+            'backgroundColor': color,
+            'border': f'1px solid {color}',
+            'fontWeight': 'bold',
+            'color': 'white',
+        },
+        {
+            'if': {'row_index': active_cell['row']},
+            'backgroundColor': color,
+            'border': f'1px solid {color}',
+            'fontWeight': 'bold',
+            'color': 'white',
+        }
+    ]
 
 
 if __name__ == '__main__':
