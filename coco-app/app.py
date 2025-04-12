@@ -25,7 +25,8 @@ DROPDOWN_ID = 'selector'
 BUTTON_ID = 'randomizer'
 CHECK_ID = 'annot-check'
 IMAGE_ID = 'img'
-TABLE_ID = 'table'
+METATABLE_ID = 'meta-table'
+ANNOTTABLE_ID = 'annot-table'
 
 
 app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -48,7 +49,7 @@ def launch_app(cfg: DictConfig) -> None:
     )
     curr_idx = 0
     curr_img, curr_annots = dataset[curr_idx]  # img is PIL
-    sample_data = pack_table()
+    meta_table, annot_table = pack_tables()
 
     # dashboard structure
     app.layout = dbc.Row(
@@ -118,11 +119,19 @@ def launch_app(cfg: DictConfig) -> None:
                 }
             ),
             html.Div(
-                dash_table.DataTable(
-                    sample_data.to_dict('records'),
-                    [{"name": col, "id": col} for col in sample_data.columns],
-                    id=TABLE_ID
-                ),
+                [
+                    dash_table.DataTable(
+                        meta_table,
+                        [{"name": col, "id": col} for col in ['Field', 'Value']],
+                        cell_selectable=False,
+                        id=METATABLE_ID
+                    ),
+                    dash_table.DataTable(
+                        annot_table,
+                        [{"name": col, "id": col} for col in ['Field', 'Value']],
+                        id=ANNOTTABLE_ID
+                    ),
+                ],
                 id='right-col',
                 style={
                     'height': '100%',
@@ -146,23 +155,25 @@ def launch_app(cfg: DictConfig) -> None:
     app.run(debug=True)
 
 
-def pack_table() -> pd.DataFrame:
+def pack_tables() -> pd.DataFrame:
     """_summary_
 
     Returns:
         pd.DataFrame: _description_
     """
     global dataset, curr_idx, curr_img, curr_annots
-    records = [
+    meta_table = [
         {'Field': 'image shape', 'Value': str(curr_img.size)},
         {'Field': 'num boxes', 'Value': len(curr_annots)}
     ]
-    for instance in curr_annots:
-        records.append({
+    annot_table = [
+        {
             'Field': 'box',
             'Value': f'{instance["bbox"]}, {instance["category_id"]}'
-        })
-    return pd.DataFrame.from_records(records)
+        }
+        for instance in curr_annots
+    ]
+    return meta_table, annot_table
 
 
 def get_image(show_boxes: bool = True) -> Image:
@@ -199,7 +210,8 @@ def get_image(show_boxes: bool = True) -> Image:
     [
         Output(IMAGE_ID, 'src'),
         Output(DROPDOWN_ID, 'value'),
-        Output(TABLE_ID, 'data')
+        Output(METATABLE_ID, 'data'),
+        Output(ANNOTTABLE_ID, 'data')
     ],
     [
         Input(DROPDOWN_ID, 'value'),
@@ -216,7 +228,7 @@ def update_datastate(idx: int, n_clicks: int, checked: str, store_data) -> Image
     """
     global dataset, curr_idx, curr_img, curr_annots
     if ctx.triggered_id == CHECK_ID:
-        return get_image(checked is not None and 'boxes' in checked), no_update, no_update
+        return get_image(checked is not None and 'boxes' in checked), no_update, no_update, no_update
 
     if ctx.triggered_id == DROPDOWN_ID:
         if idx is None:
@@ -225,25 +237,25 @@ def update_datastate(idx: int, n_clicks: int, checked: str, store_data) -> Image
         idx = random.randint(0, len(dataset) - 1)
 
     if idx == curr_idx:
-        return no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update
 
     # only runs when need to present user a different image
     curr_idx = idx
     curr_img, curr_annots = dataset[idx]
-    return get_image(checked is not None and 'boxes' in checked), idx, pack_table().to_dict('records')
+    return get_image(checked is not None and 'boxes' in checked), idx, *pack_tables()
 
 
 @app.callback(
     [
-        Output(TABLE_ID, 'style_data_conditional'),
-        Output(TABLE_ID, 'selected_cells'),
+        Output(ANNOTTABLE_ID, 'style_data_conditional'),
+        Output(ANNOTTABLE_ID, 'selected_cells'),
         Output(STORE_ID, 'data')
     ],
     [
-        Input(TABLE_ID, 'active_cell'),
-        Input(TABLE_ID, 'selected_cells')
+        Input(ANNOTTABLE_ID, 'active_cell'),
+        Input(ANNOTTABLE_ID, 'selected_cells')
     ],
-    State(TABLE_ID, 'data')
+    State(ANNOTTABLE_ID, 'data')
 )
 def update_graphs(active_cell, selected_cells, table_data):
     if active_cell is None:
