@@ -118,7 +118,6 @@ def launch_app(cfg: DictConfig) -> None:
                 dash_table.DataTable(
                     sample_data.to_dict('records'),
                     [{"name": col, "id": col} for col in sample_data.columns],
-                    active_cell=None,
                     id=TABLE_ID
                 ),
                 id='right-col',
@@ -224,19 +223,25 @@ def update_datastate(idx: int, n_clicks: int, checked: str) -> Image:
 
 
 @app.callback(
-    Output(TABLE_ID, 'style_data_conditional'),
-    Input(TABLE_ID, 'active_cell')
+    [
+        Output(TABLE_ID, 'style_data_conditional'),
+        Output(TABLE_ID, 'selected_cells')
+    ],
+    [
+        Input(TABLE_ID, 'active_cell'),
+        Input(TABLE_ID, 'selected_cells')
+    ]
 )
-def update_graphs(active_cell):
+def update_graphs(active_cell, selected_cells):
     if active_cell is None:
         return no_update  # Dash will run callbacks on launch
 
-    # first condition disables default cell highlighting
-    # second condition highlights the row
+    # first condition overrides default active cell highlight
+    # second condition highlights cells in active row
     color = '#4682b4'
-    return [
+    style = [
         {
-            "if": {"state": "selected"},
+            "if": {"state": "active"},
             'backgroundColor': color,
             'border': f'1px solid {color}',
             'fontWeight': 'bold',
@@ -250,6 +255,9 @@ def update_graphs(active_cell):
             'color': 'white',
         }
     ]
+
+    # setting 'selected_cells' to [] spoofs disabling shift-clicks
+    return style, []
 
 
 if __name__ == '__main__':
