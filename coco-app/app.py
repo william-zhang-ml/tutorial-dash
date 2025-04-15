@@ -1,6 +1,7 @@
 """
 Application for browsing object detection datasets.
 """
+from ast import literal_eval
 from base64 import b64decode, b64encode
 from io import BytesIO
 from random import randint
@@ -25,6 +26,7 @@ IMG_STORE_ID = 'img-store'
 OVERLAY_STORE_ID = 'overlay-store'
 IMAGE_ID = 'image'
 BUTTON_ID = 'randomizer'
+TOGGLE_ID = 'toggle'
 META_TABLE_ID = 'metadata-table'
 ANNOT_TABLE_ID = 'annotation-table'
 
@@ -91,6 +93,12 @@ def launch_app(cfg: DictConfig = None) -> None:
                         id=BUTTON_ID,
                         style={'width': '8rem'}
                     ),
+                    dbc.Button(
+                        'Toggle Boxes',
+                        color='primary',
+                        id=TOGGLE_ID,
+                        style={'width': '8rem'}
+                    )
                 ],
                 class_name='col',
                 id='left-col',
@@ -162,8 +170,18 @@ def update_display(data_store, overlay_store):
         {'Field': 'image shape', 'Value': str(img.size)},
         {'Field': 'num boxes', 'Value': len(data_store['annots'])}
     ]
-    annotdata = data_store['annots']
-    return img, metadata, annotdata, None
+    annotations = data_store['annots']
+
+    if overlay_store['show']:
+        draw = Draw(img)
+        for instance in annotations:
+            box_x, box_y, box_w, box_h = literal_eval(instance['Box'])
+            draw.rectangle(
+                [(box_x, box_y), (box_x + box_w, box_y + box_h)],
+                outline='magenta'
+            )
+
+    return img, metadata, annotations, None
 
 
 @app.callback(
@@ -256,6 +274,18 @@ def update_graphs(active_cell, store):
     ]
 
     return new_store, style
+
+
+@app.callback(
+    Output(OVERLAY_STORE_ID, 'data', allow_duplicate=True),
+    Input(TOGGLE_ID, 'n_clicks'),
+    State(OVERLAY_STORE_ID, 'data'),
+    prevent_initial_call=True
+)
+def toggle_boxes(_, store) -> List:
+    new_store = store.copy()
+    new_store['show'] = not new_store['show']
+    return new_store
 
 
 @app.callback(
