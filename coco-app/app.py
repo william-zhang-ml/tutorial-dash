@@ -22,11 +22,11 @@ from PIL.ImageDraw import Draw
 from torchvision.datasets import CocoDetection
 
 
-IMG_STORE_ID = 'img-store'
+SAMPLE_STORE_ID = 'img-store'
 OVERLAY_STORE_ID = 'overlay-store'
 IMAGE_ID = 'image'
-DROPDOWN_ID = 'selector'
-BUTTON_ID = 'randomizer'
+SELECT_SAMP_DROPDOWN_ID = 'selector'
+RANDOM_SAMP_BUTTON_ID = 'randomizer'
 TOGGLE_ID = 'toggle'
 META_TABLE_ID = 'metadata-table'
 ANNOT_TABLE_ID = 'annotation-table'
@@ -51,11 +51,11 @@ def launch_app(cfg: DictConfig = None) -> None:
             dcc.Store(
                 data={
                     'num_images': len(dataset),
-                    'idx': None,
+                    'samp_idx': None,
                     'img': None,
                     'annots': None
                 },
-                id=IMG_STORE_ID
+                id=SAMPLE_STORE_ID
             ),
             dcc.Store(
                 data={
@@ -91,13 +91,13 @@ def launch_app(cfg: DictConfig = None) -> None:
                     dcc.Dropdown(
                         list(range(cfg.num_dropdown)),
                         None,
-                        id=DROPDOWN_ID,
+                        id=SELECT_SAMP_DROPDOWN_ID,
                         style={'width': '16rem'}
                     ),
                     dbc.Button(
                         'Random',
                         color='primary',
-                        id=BUTTON_ID,
+                        id=RANDOM_SAMP_BUTTON_ID,
                         style={'width': '8rem'}
                     ),
                     dbc.Button(
@@ -155,13 +155,77 @@ def launch_app(cfg: DictConfig = None) -> None:
 
 
 @app.callback(
+    Output(SAMPLE_STORE_ID, 'data'),
+    [
+        Input(SELECT_SAMP_DROPDOWN_ID, 'value'),
+        Input(RANDOM_SAMP_BUTTON_ID, 'n_clicks'),
+        State(SAMPLE_STORE_ID, 'data')
+    ],
+    prevent_initial_call=True
+)
+def select_and_get_sample(selected: int, _, store: Dict) -> Dict:
+    """Select and get new sample from dataset.
+
+    Args:
+        _ (_type_): _description_
+
+    Returns:
+        dict: _description_
+    """
+    if ctx.triggered_id == SELECT_SAMP_DROPDOWN_ID:
+        if selected is None:
+            return no_update
+        idx = selected
+    elif ctx.triggered_id == RANDOM_SAMP_BUTTON_ID:
+        idx = randint(0, store['num_images'] - 1)
+
+    if idx == store['samp_idx']:
+        return no_update
+
+    img, annots = get_sample(idx)
+    new_store = store.copy()
+    new_store['samp_idx'] = idx
+    new_store['img'] = img
+    new_store['annots'] = annots
+
+    return new_store
+
+
+def get_sample(idx: int) -> Tuple[str, List[Dict]]:
+    """Get idx-th sample.
+
+    Args:
+        idx (int): dataset index
+
+    Returns:
+        Tuple[str, List[Dict]]: image, instance annotations
+    """
+    global dataset
+    img, annots = dataset[idx]
+
+    img_stream = BytesIO()
+    img.save(img_stream, format='PNG')
+    img_stream.seek(0)
+    img = b64encode(img_stream.read()).decode()
+    annots = [
+        {
+            'Box': str(instance['bbox']),
+            'Category': str(instance['category_id'])
+        }
+        for instance in annots
+    ]
+
+    return img, annots
+
+
+@app.callback(
     [
         Output(IMAGE_ID, 'src'),
         Output(META_TABLE_ID, 'data'),
         Output(ANNOT_TABLE_ID, 'data'),
         Output(ANNOT_TABLE_ID, 'active_cell')
     ],
-    State(IMG_STORE_ID, 'data'),
+    State(SAMPLE_STORE_ID, 'data'),
     Input(OVERLAY_STORE_ID, 'data'),
     State(ANNOT_TABLE_ID, 'active_cell'),
     prevent_initial_call=True
@@ -197,52 +261,13 @@ def update_display(data_store, overlay_store, active_cell):
 
 @app.callback(
     Output(OVERLAY_STORE_ID, 'data', allow_duplicate=True),
-    Input(IMG_STORE_ID, 'data'),
+    Input(SAMPLE_STORE_ID, 'data'),
     State(OVERLAY_STORE_ID, 'data'),
     prevent_initial_call=True
 )
 def update_overlay(_, overlay_store) -> dict:
     new_store = overlay_store.copy()
     new_store['highlight_idx'] = None
-    return new_store
-
-
-@app.callback(
-    Output(IMG_STORE_ID, 'data'),
-    [
-        Input(BUTTON_ID, 'n_clicks'),
-        State(IMG_STORE_ID, 'data')
-    ],
-    prevent_initial_call=True
-)
-def get_sample(_, store) -> dict:
-    """Get a different sample from the dataset.
-
-    Args:
-        _ (_type_): _description_
-
-    Returns:
-        dict: _description_
-    """
-    idx = randint(0, store['num_images'] - 1)
-    if idx == store['idx']:
-        return no_update
-
-    img, annots = get_image(idx)
-    img_stream = BytesIO()
-    img.save(img_stream, format='PNG')
-    img_stream.seek(0)
-
-    new_store = store.copy()
-    new_store['idx'] = idx
-    new_store['img'] = b64encode(img_stream.read()).decode()
-    new_store['annots'] = [
-        {
-            'Box': str(instance['bbox']),
-            'Category': str(instance['category_id'])
-        }
-        for instance in annots
-    ]
     return new_store
 
 
@@ -303,19 +328,6 @@ def update_overlay_settings(_, active_cell, store):
 def suppress_cell_highlight(_) -> List:
     """Unselect selected annotation cells. """
     return []
-
-
-def get_image(idx: int) -> Tuple[Image.Image, List[Dict]]:
-    """Get the idx-th image.
-
-    Args:
-        idx (int): dataset index
-
-    Returns:
-        Tuple[Image.Image, List[Dict]]: image, instance annotations
-    """
-    global dataset
-    return dataset[idx]
 
 
 if __name__ == '__main__':
