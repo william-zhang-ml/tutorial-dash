@@ -249,19 +249,27 @@ def alert_new_sample(_, store: Dict) -> Dict:
     State(SETTINGS_STORE_ID, 'data'),
     prevent_initial_call=True
 )
-def update_display_settings(_, active_cell, store):
+def update_display_settings(_: int, active_cell: Dict, store: Dict) -> Dict:
+    """Update display settings based on UI interactions
+
+    Args:
+        _ (int): cumulative button clicks
+        active_cell (Dict): active table cell
+        store (Dict): display settings store state
+
+    Returns:
+        Dict: new display settings store state
+    """
+    new_store = store.copy()
+
     if ctx.triggered_id == TOGGLE_ID:
-        new_store = store.copy()
         new_store['show'] = not new_store['show']
 
     if ctx.triggered_id == ANNOT_TABLE_ID:
         if active_cell is None:
-            new_store = store.copy()
             new_store['highlight_idx'] = None
-            return new_store
-
-        new_store = store.copy()
-        new_store['highlight_idx'] = active_cell['row']
+        else:
+            new_store['highlight_idx'] = active_cell['row']
 
     return new_store
 
@@ -278,30 +286,48 @@ def update_display_settings(_, active_cell, store):
     State(ANNOT_TABLE_ID, 'active_cell'),
     prevent_initial_call=True
 )
-def update_display(data_store, overlay_store, active_cell):
+def update_display(
+    sample_store: Dict,
+    settings_store: Dict,
+    active_cell: Dict
+) -> Tuple[Image.Image, Dict, Dict, Dict]:
+    """Update user display.
+
+    Args:
+        sample_store (Dict): sample store state
+        settings_store (Dict): display settings store state
+        active_cell (Dict): active cell in annotation table
+
+    Returns:
+        Tuple: new image, new table data, new table data, new active cell
+    """
     img = Image.open(
         BytesIO(
             b64decode(
-                data_store['img'].encode()
+                sample_store['img'].encode()
             )
         )
     )
     metadata = [
         {'Field': 'image shape', 'Value': str(img.size)},
-        {'Field': 'num boxes', 'Value': len(data_store['annots'])}
+        {'Field': 'num boxes', 'Value': len(sample_store['annots'])}
     ]
-    annotations = data_store['annots']
+    annotations = sample_store['annots']
 
-    if overlay_store['show']:
+    if settings_store['show']:
         draw = Draw(img)
         for idx, instance in enumerate(annotations):
             box_x, box_y, box_w, box_h = literal_eval(instance['Box'])
+            if idx == settings_store['highlight_idx']:
+                color = 'cyan'
+            else:
+                color = 'magenta'
             draw.rectangle(
                 [(box_x, box_y), (box_x + box_w, box_y + box_h)],
-                outline='cyan' if idx == overlay_store['highlight_idx'] else 'magenta'
+                outline=color
             )
 
-    if overlay_store['highlight_idx'] is None:
+    if settings_store['highlight_idx'] is None:
         active_cell = None
 
     return img, metadata, annotations, active_cell
