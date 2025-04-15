@@ -181,6 +181,15 @@ def updata_sample_display(img_store) -> Image:
     return img, metadata, annotdata
 
 
+@app.callback(
+    Output(ANNOT_TABLE_ID, 'selected_cells'),
+    Input(ANNOT_TABLE_ID, 'selected_cells')
+)
+def suppress_cell_highlight(_) -> List:
+    """Unselect selected annotation cells. """
+    return []
+
+
 def get_image(idx: int) -> Tuple[Image, List[Dict]]:
     """Get the idx-th image.
 
