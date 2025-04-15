@@ -23,7 +23,7 @@ from torchvision.datasets import CocoDetection
 
 
 SAMPLE_STORE_ID = 'img-store'
-OVERLAY_STORE_ID = 'overlay-store'
+SETTINGS_STORE_ID = 'overlay-store'
 IMAGE_ID = 'image'
 SELECT_SAMP_DROPDOWN_ID = 'selector'
 RANDOM_SAMP_BUTTON_ID = 'randomizer'
@@ -62,7 +62,7 @@ def launch_app(cfg: DictConfig = None) -> None:
                     'show': False,
                     'highlight_idx': None,
                 },
-                id=OVERLAY_STORE_ID
+                id=SETTINGS_STORE_ID
             ),
             dbc.Col(
                 [
@@ -163,14 +163,16 @@ def launch_app(cfg: DictConfig = None) -> None:
     ],
     prevent_initial_call=True
 )
-def select_and_get_sample(selected: int, _, store: Dict) -> Dict:
+def select_and_get_sample(selected: int, _: int, store: Dict) -> Dict:
     """Select and get new sample from dataset.
 
     Args:
-        _ (_type_): _description_
+        selected (int): dropdown menu selection
+        _ (int): cumulative button clicks
+        store (Dict): sample store state
 
     Returns:
-        dict: _description_
+        Dict: new sample store state
     """
     if ctx.triggered_id == SELECT_SAMP_DROPDOWN_ID:
         if selected is None:
@@ -219,6 +221,52 @@ def get_sample(idx: int) -> Tuple[str, List[Dict]]:
 
 
 @app.callback(
+    Output(SETTINGS_STORE_ID, 'data', allow_duplicate=True),
+    Input(SAMPLE_STORE_ID, 'data'),
+    State(SETTINGS_STORE_ID, 'data'),
+    prevent_initial_call=True
+)
+def alert_new_sample(_, store: Dict) -> Dict:
+    """Clear highlighted box setting and force display update.
+
+    Args:
+        _ (Dict): sample store state
+        store: display settings store state
+
+    Dict: new display settings store state
+    """
+    new_store = store.copy()
+    new_store['highlight_idx'] = None
+    return new_store
+
+
+@app.callback(
+    Output(SETTINGS_STORE_ID, 'data', allow_duplicate=True),
+    [
+        Input(TOGGLE_ID, 'n_clicks'),
+        Input(ANNOT_TABLE_ID, 'active_cell')
+    ],
+    State(SETTINGS_STORE_ID, 'data'),
+    prevent_initial_call=True
+)
+def update_display_settings(_, active_cell, store):
+    if ctx.triggered_id == TOGGLE_ID:
+        new_store = store.copy()
+        new_store['show'] = not new_store['show']
+
+    if ctx.triggered_id == ANNOT_TABLE_ID:
+        if active_cell is None:
+            new_store = store.copy()
+            new_store['highlight_idx'] = None
+            return new_store
+
+        new_store = store.copy()
+        new_store['highlight_idx'] = active_cell['row']
+
+    return new_store
+
+
+@app.callback(
     [
         Output(IMAGE_ID, 'src'),
         Output(META_TABLE_ID, 'data'),
@@ -226,7 +274,7 @@ def get_sample(idx: int) -> Tuple[str, List[Dict]]:
         Output(ANNOT_TABLE_ID, 'active_cell')
     ],
     State(SAMPLE_STORE_ID, 'data'),
-    Input(OVERLAY_STORE_ID, 'data'),
+    Input(SETTINGS_STORE_ID, 'data'),
     State(ANNOT_TABLE_ID, 'active_cell'),
     prevent_initial_call=True
 )
@@ -260,44 +308,30 @@ def update_display(data_store, overlay_store, active_cell):
 
 
 @app.callback(
-    Output(OVERLAY_STORE_ID, 'data', allow_duplicate=True),
-    Input(SAMPLE_STORE_ID, 'data'),
-    State(OVERLAY_STORE_ID, 'data'),
-    prevent_initial_call=True
-)
-def update_overlay(_, overlay_store) -> dict:
-    new_store = overlay_store.copy()
-    new_store['highlight_idx'] = None
-    return new_store
-
-
-@app.callback(
     [
-        Output(OVERLAY_STORE_ID, 'data', allow_duplicate=True),
-        Output(ANNOT_TABLE_ID, 'style_data_conditional'),
+        Output(ANNOT_TABLE_ID, 'selected_cells'),
+        Output(ANNOT_TABLE_ID, 'style_data_conditional')
     ],
     [
-        Input(TOGGLE_ID, 'n_clicks'),
-        Input(ANNOT_TABLE_ID, 'active_cell')
-    ],
-    State(OVERLAY_STORE_ID, 'data'),
-    prevent_initial_call=True
+        Input(ANNOT_TABLE_ID, 'active_cell'),
+        Input(ANNOT_TABLE_ID, 'selected_cells')
+    ]
 )
-def update_overlay_settings(_, active_cell, store):
-    if ctx.triggered_id == TOGGLE_ID:
-        new_store = store.copy()
-        new_store['show'] = not new_store['show']
-        style = no_update
+def format_annotation_table(
+    active_cell: Dict,
+    _: List[Dict]
+    ) -> Tuple[List, List[Dict]]:
+    """Highlight active row (not active cell) and disallow multi-selection.
 
-    if ctx.triggered_id == ANNOT_TABLE_ID:
-        if active_cell is None:
-            new_store = store.copy()
-            new_store['highlight_idx'] = None
-            return new_store, []
+    Args:
+        active_cell (Dict): active table cell
+        _ (List[Dict]): selected table cells
 
-        new_store = store.copy()
-        new_store['highlight_idx'] = active_cell['row']
-
+    Returns:
+        Tuple[List, List[Dict]]: no selected cells, row formatting
+    """
+    style = []
+    if active_cell is not None:
         # first condition overrides default active cell highlight
         # second condition highlights cells in active row
         color = '#4682b4'
@@ -317,17 +351,7 @@ def update_overlay_settings(_, active_cell, store):
                 'color': 'white',
             }
         ]
-
-    return new_store, style
-
-
-@app.callback(
-    Output(ANNOT_TABLE_ID, 'selected_cells'),
-    Input(ANNOT_TABLE_ID, 'selected_cells')
-)
-def suppress_cell_highlight(_) -> List:
-    """Unselect selected annotation cells. """
-    return []
+    return [], style
 
 
 if __name__ == '__main__':
