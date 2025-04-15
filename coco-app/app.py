@@ -9,6 +9,7 @@ from dash import (
     html,
     Input, Output, State, no_update
 )
+from dash.dash_table import DataTable
 import dash_bootstrap_components as dbc
 import hydra
 from omegaconf import DictConfig
@@ -21,6 +22,8 @@ IMG_STORE_ID = 'img-store'
 OVERLAY_STORE_ID = 'overlay-store'
 IMAGE_ID = 'image'
 BUTTON_ID = 'randomizer'
+META_TABLE_ID = 'metadata-table'
+ANNOT_TABLE_ID = 'annotation-table'
 
 
 app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -39,6 +42,13 @@ def launch_app(cfg: DictConfig = None) -> None:
 
     app.layout = dbc.Row(
         [
+            dcc.Store(
+                data={
+                    'num_images': len(dataset),
+                    'idx': None,
+                },
+                id=IMG_STORE_ID
+            ),
             dbc.Col(
                 [
                     html.Div(
@@ -74,25 +84,38 @@ def launch_app(cfg: DictConfig = None) -> None:
                 id='left-col',
                 style={
                     'border': '1px solid black',
+                    'padding-top': '4%',
                     'display': 'flex',
                     'flex-direction': 'column',
-                    'justify-content': 'center',
+                    'justify-content': 'flex-start',
                     'align-items': 'center'
                 }
             ),
             dbc.Col(
+                [
+                    DataTable(
+                        [],
+                        [{"name": col, "id": col} for col in ['Field', 'Value']],
+                        cell_selectable=False,
+                        id=META_TABLE_ID
+                    ),
+                    DataTable(
+                        [],
+                        [{"name": col, "id": col} for col in ['Field', 'Value']],
+                        id=ANNOT_TABLE_ID,
+                        style_table={'height': '480px', 'overflowY': 'auto'}
+                    )
+                ],
                 class_name='col',
                 id='right-col',
                 style={
-                    'border': '1px solid black'
+                    'border': '1px solid black',
+                    'padding-top': '4%',
+                    'display': 'flex',
+                    'flex-direction': 'column',
+                    'justify-content': 'flex-start',
+                    'align-items': 'center'
                 }
-            ),
-            dcc.Store(
-                data={
-                    'num_images': len(dataset),
-                    'idx': None,
-                },
-                id=IMG_STORE_ID
             )
         ],
         style={
@@ -130,9 +153,11 @@ def select_new_image(_, img_store) -> dict:
 
 @app.callback(
     Output(IMAGE_ID, 'src'),
+    Output(META_TABLE_ID, 'data'),
+    Output(ANNOT_TABLE_ID, 'data'),
     Input(IMG_STORE_ID, 'data')
 )
-def display_new_image(img_store) -> Image:
+def updata_sample_display(img_store) -> Image:
     """_summary_
 
     Args:
@@ -141,8 +166,19 @@ def display_new_image(img_store) -> Image:
     Returns:
         Image: _description_
     """
-    img, _ = get_image(img_store['idx'])
-    return img
+    img, annots = get_image(img_store['idx'])
+    metadata = [
+        {'Field': 'image shape', 'Value': str(img.size)},
+        {'Field': 'num boxes', 'Value': len(annots)}
+    ]
+    annotdata = [
+        {
+            'Field': 'box',
+            'Value': f'{instance["bbox"]}, {instance["category_id"]}'
+        }
+        for instance in annots
+    ]
+    return img, metadata, annotdata
 
 
 def get_image(idx: int) -> Tuple[Image, List[Dict]]:
