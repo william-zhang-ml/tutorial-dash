@@ -122,13 +122,19 @@ def launch_app(cfg: DictConfig = None) -> None:
                 [
                     DataTable(
                         [],
-                        [{"name": col, "id": col} for col in ['Field', 'Value']],
+                        [
+                            {"name": 'col', "id": col}
+                            for col in ['Field', 'Value']
+                        ],
                         cell_selectable=False,
                         id=META_TABLE_ID
                     ),
                     DataTable(
                         [],
-                        [{"name": col, "id": col} for col in ['Box', 'Category']],
+                        [
+                            {"name": col, "id": col}
+                            for col in ['Box', 'Category']
+                        ],
                         id=ANNOT_TABLE_ID,
                         style_table={'height': '480px', 'overflowY': 'auto'}
                     )
@@ -346,7 +352,7 @@ def update_display(
 def format_annotation_table(
     active_cell: Dict,
     _: List[Dict]
-    ) -> Tuple[List, List[Dict]]:
+) -> Tuple[List, List[Dict]]:
     """Highlight active row (not active cell) and disallow multi-selection.
 
     Args:
