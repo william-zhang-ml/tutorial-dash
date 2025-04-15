@@ -156,9 +156,10 @@ def launch_app(cfg: DictConfig = None) -> None:
     ],
     State(IMG_STORE_ID, 'data'),
     Input(OVERLAY_STORE_ID, 'data'),
+    State(ANNOT_TABLE_ID, 'active_cell'),
     prevent_initial_call=True
 )
-def update_display(data_store, overlay_store):
+def update_display(data_store, overlay_store, active_cell):
     img = Image.open(
         BytesIO(
             b64decode(
@@ -174,14 +175,17 @@ def update_display(data_store, overlay_store):
 
     if overlay_store['show']:
         draw = Draw(img)
-        for instance in annotations:
+        for idx, instance in enumerate(annotations):
             box_x, box_y, box_w, box_h = literal_eval(instance['Box'])
             draw.rectangle(
                 [(box_x, box_y), (box_x + box_w, box_y + box_h)],
-                outline='magenta'
+                outline='cyan' if idx == overlay_store['highlight_idx'] else 'magenta'
             )
 
-    return img, metadata, annotations, None
+    if overlay_store['highlight_idx'] is None:
+        active_cell = None
+
+    return img, metadata, annotations, active_cell
 
 
 @app.callback(
@@ -247,11 +251,11 @@ def get_sample(_, store) -> dict:
 def update_graphs(active_cell, store):
     if active_cell is None:
         new_store = store.copy()
-        new_store['annot_idx'] = None
+        new_store['highlight_idx'] = None
         return new_store, []
 
     new_store = store.copy()
-    new_store['annot_idx'] = active_cell['row']
+    new_store['highlight_idx'] = active_cell['row']
 
     # first condition overrides default active cell highlight
     # second condition highlights cells in active row
