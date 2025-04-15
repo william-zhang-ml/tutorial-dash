@@ -1,7 +1,9 @@
 """
 Application for browsing object detection datasets.
 """
-import random
+from base64 import b64decode, b64encode
+from io import BytesIO
+from random import randint
 from typing import Dict, List, Tuple
 from dash import (
     Dash,
@@ -13,7 +15,7 @@ from dash.dash_table import DataTable
 import dash_bootstrap_components as dbc
 import hydra
 from omegaconf import DictConfig
-from PIL.Image import Image
+from PIL import Image
 from PIL.ImageDraw import Draw
 from torchvision.datasets import CocoDetection
 
@@ -46,8 +48,17 @@ def launch_app(cfg: DictConfig = None) -> None:
                 data={
                     'num_images': len(dataset),
                     'idx': None,
+                    'img': None,
+                    'annots': None
                 },
                 id=IMG_STORE_ID
+            ),
+            dcc.Store(
+                data={
+                    'show': False,
+                    'highlight_idx': None,
+                },
+                id=OVERLAY_STORE_ID
             ),
             dbc.Col(
                 [
@@ -101,7 +112,7 @@ def launch_app(cfg: DictConfig = None) -> None:
                     ),
                     DataTable(
                         [],
-                        [{"name": col, "id": col} for col in ['Field', 'Value']],
+                        [{"name": col, "id": col} for col in ['Box', 'Category']],
                         id=ANNOT_TABLE_ID,
                         style_table={'height': '480px', 'overflowY': 'auto'}
                     )
@@ -128,14 +139,50 @@ def launch_app(cfg: DictConfig = None) -> None:
 
 
 @app.callback(
+    [
+        Output(IMAGE_ID, 'src'),
+        Output(META_TABLE_ID, 'data'),
+        Output(ANNOT_TABLE_ID, 'data')
+    ],
+    State(IMG_STORE_ID, 'data'),
+    Input(OVERLAY_STORE_ID, 'data')
+)
+def update_display(data_store, overlay_store):
+    img = Image.open(
+        BytesIO(
+            b64decode(
+                data_store['img'].encode()
+            )
+        )
+    )
+    metadata = [
+        {'Field': 'image shape', 'Value': str(img.size)},
+        {'Field': 'num boxes', 'Value': len(data_store['annots'])}
+    ]
+    annotdata = data_store['annots']
+    return img, metadata, annotdata
+
+
+@app.callback(
+    Output(OVERLAY_STORE_ID, 'data'),
+    Input(IMG_STORE_ID, 'data'),
+    State(OVERLAY_STORE_ID, 'data')
+)
+def update_overlay(_, overlay_store) -> dict:
+    new_store = overlay_store.copy()
+    new_store['highlight_idx'] = None
+    return new_store
+
+
+@app.callback(
     Output(IMG_STORE_ID, 'data'),
     [
         Input(BUTTON_ID, 'n_clicks'),
         State(IMG_STORE_ID, 'data')
     ]
 )
-def select_new_image(_, img_store) -> dict:
-    """Determine if app needs to get a different image.
+def get_sample(_, store) -> dict:
+    """Get a different sample from the dataset.
 
     Args:
         _ (_type_): _description_
@@ -143,42 +190,26 @@ def select_new_image(_, img_store) -> dict:
     Returns:
         dict: _description_
     """
-    idx = random.randint(0, img_store['num_images'] - 1)
-    if idx == img_store['idx']:
+    idx = randint(0, store['num_images'] - 1)
+    if idx == store['idx']:
         return no_update
-    new_store = img_store.copy()
+
+    img, annots = get_image(idx)
+    img_stream = BytesIO()
+    img.save(img_stream, format='PNG')
+    img_stream.seek(0)
+
+    new_store = store.copy()
     new_store['idx'] = idx
-    return new_store
-
-
-@app.callback(
-    Output(IMAGE_ID, 'src'),
-    Output(META_TABLE_ID, 'data'),
-    Output(ANNOT_TABLE_ID, 'data'),
-    Input(IMG_STORE_ID, 'data')
-)
-def updata_sample_display(img_store) -> Image:
-    """_summary_
-
-    Args:
-        img_store (_type_): _description_
-
-    Returns:
-        Image: _description_
-    """
-    img, annots = get_image(img_store['idx'])
-    metadata = [
-        {'Field': 'image shape', 'Value': str(img.size)},
-        {'Field': 'num boxes', 'Value': len(annots)}
-    ]
-    annotdata = [
+    new_store['img'] = b64encode(img_stream.read()).decode()
+    new_store['annots'] = [
         {
-            'Field': 'box',
-            'Value': f'{instance["bbox"]}, {instance["category_id"]}'
+            'Box': str(instance['bbox']),
+            'Category': str(instance['category_id'])
         }
         for instance in annots
     ]
-    return img, metadata, annotdata
+    return new_store
 
 
 @app.callback(
@@ -190,14 +221,14 @@ def suppress_cell_highlight(_) -> List:
     return []
 
 
-def get_image(idx: int) -> Tuple[Image, List[Dict]]:
+def get_image(idx: int) -> Tuple[Image.Image, List[Dict]]:
     """Get the idx-th image.
 
     Args:
         idx (int): dataset index
 
     Returns:
-        Tuple[Image, List[Dict]]: image, instance annotations
+        Tuple[Image.Image, List[Dict]]: image, instance annotations
     """
     global dataset
     return dataset[idx]
