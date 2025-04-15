@@ -25,6 +25,7 @@ from torchvision.datasets import CocoDetection
 IMG_STORE_ID = 'img-store'
 OVERLAY_STORE_ID = 'overlay-store'
 IMAGE_ID = 'image'
+DROPDOWN_ID = 'selector'
 BUTTON_ID = 'randomizer'
 TOGGLE_ID = 'toggle'
 META_TABLE_ID = 'metadata-table'
@@ -86,6 +87,12 @@ def launch_app(cfg: DictConfig = None) -> None:
                             'align-items': 'center',
                             'justify-content': 'center'
                         }
+                    ),
+                    dcc.Dropdown(
+                        list(range(cfg.num_dropdown)),
+                        None,
+                        id=DROPDOWN_ID,
+                        style={'width': '16rem'}
                     ),
                     dbc.Button(
                         'Random',
@@ -244,52 +251,49 @@ def get_sample(_, store) -> dict:
         Output(OVERLAY_STORE_ID, 'data', allow_duplicate=True),
         Output(ANNOT_TABLE_ID, 'style_data_conditional'),
     ],
-    Input(ANNOT_TABLE_ID, 'active_cell'),
+    [
+        Input(TOGGLE_ID, 'n_clicks'),
+        Input(ANNOT_TABLE_ID, 'active_cell')
+    ],
     State(OVERLAY_STORE_ID, 'data'),
     prevent_initial_call=True
 )
-def update_graphs(active_cell, store):
-    if active_cell is None:
+def update_overlay_settings(_, active_cell, store):
+    if ctx.triggered_id == TOGGLE_ID:
         new_store = store.copy()
-        new_store['highlight_idx'] = None
-        return new_store, []
+        new_store['show'] = not new_store['show']
+        style = no_update
 
-    new_store = store.copy()
-    new_store['highlight_idx'] = active_cell['row']
+    if ctx.triggered_id == ANNOT_TABLE_ID:
+        if active_cell is None:
+            new_store = store.copy()
+            new_store['highlight_idx'] = None
+            return new_store, []
 
-    # first condition overrides default active cell highlight
-    # second condition highlights cells in active row
-    color = '#4682b4'
-    style = [
-        {
-            "if": {"state": "active"},
-            'backgroundColor': color,
-            'border': f'1px solid {color}',
-            'fontWeight': 'bold',
-            'color': 'white',
-        },
-        {
-            'if': {'row_index': active_cell['row']},
-            'backgroundColor': color,
-            'border': f'1px solid {color}',
-            'fontWeight': 'bold',
-            'color': 'white',
-        }
-    ]
+        new_store = store.copy()
+        new_store['highlight_idx'] = active_cell['row']
+
+        # first condition overrides default active cell highlight
+        # second condition highlights cells in active row
+        color = '#4682b4'
+        style = [
+            {
+                "if": {"state": "active"},
+                'backgroundColor': color,
+                'border': f'1px solid {color}',
+                'fontWeight': 'bold',
+                'color': 'white',
+            },
+            {
+                'if': {'row_index': active_cell['row']},
+                'backgroundColor': color,
+                'border': f'1px solid {color}',
+                'fontWeight': 'bold',
+                'color': 'white',
+            }
+        ]
 
     return new_store, style
-
-
-@app.callback(
-    Output(OVERLAY_STORE_ID, 'data', allow_duplicate=True),
-    Input(TOGGLE_ID, 'n_clicks'),
-    State(OVERLAY_STORE_ID, 'data'),
-    prevent_initial_call=True
-)
-def toggle_boxes(_, store) -> List:
-    new_store = store.copy()
-    new_store['show'] = not new_store['show']
-    return new_store
 
 
 @app.callback(
