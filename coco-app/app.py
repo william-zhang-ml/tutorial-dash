@@ -7,6 +7,7 @@ from random import randint
 from typing import Dict, List, Tuple
 from dash import (
     Dash,
+    ctx,
     dcc,
     html,
     Input, Output, State, no_update
@@ -142,10 +143,12 @@ def launch_app(cfg: DictConfig = None) -> None:
     [
         Output(IMAGE_ID, 'src'),
         Output(META_TABLE_ID, 'data'),
-        Output(ANNOT_TABLE_ID, 'data')
+        Output(ANNOT_TABLE_ID, 'data'),
+        Output(ANNOT_TABLE_ID, 'active_cell')
     ],
     State(IMG_STORE_ID, 'data'),
-    Input(OVERLAY_STORE_ID, 'data')
+    Input(OVERLAY_STORE_ID, 'data'),
+    prevent_initial_call=True
 )
 def update_display(data_store, overlay_store):
     img = Image.open(
@@ -160,13 +163,14 @@ def update_display(data_store, overlay_store):
         {'Field': 'num boxes', 'Value': len(data_store['annots'])}
     ]
     annotdata = data_store['annots']
-    return img, metadata, annotdata
+    return img, metadata, annotdata, None
 
 
 @app.callback(
-    Output(OVERLAY_STORE_ID, 'data'),
+    Output(OVERLAY_STORE_ID, 'data', allow_duplicate=True),
     Input(IMG_STORE_ID, 'data'),
-    State(OVERLAY_STORE_ID, 'data')
+    State(OVERLAY_STORE_ID, 'data'),
+    prevent_initial_call=True
 )
 def update_overlay(_, overlay_store) -> dict:
     new_store = overlay_store.copy()
@@ -179,7 +183,8 @@ def update_overlay(_, overlay_store) -> dict:
     [
         Input(BUTTON_ID, 'n_clicks'),
         State(IMG_STORE_ID, 'data')
-    ]
+    ],
+    prevent_initial_call=True
 )
 def get_sample(_, store) -> dict:
     """Get a different sample from the dataset.
@@ -210,6 +215,47 @@ def get_sample(_, store) -> dict:
         for instance in annots
     ]
     return new_store
+
+
+@app.callback(
+    [
+        Output(OVERLAY_STORE_ID, 'data', allow_duplicate=True),
+        Output(ANNOT_TABLE_ID, 'style_data_conditional'),
+    ],
+    Input(ANNOT_TABLE_ID, 'active_cell'),
+    State(OVERLAY_STORE_ID, 'data'),
+    prevent_initial_call=True
+)
+def update_graphs(active_cell, store):
+    if active_cell is None:
+        new_store = store.copy()
+        new_store['annot_idx'] = None
+        return new_store, []
+
+    new_store = store.copy()
+    new_store['annot_idx'] = active_cell['row']
+
+    # first condition overrides default active cell highlight
+    # second condition highlights cells in active row
+    color = '#4682b4'
+    style = [
+        {
+            "if": {"state": "active"},
+            'backgroundColor': color,
+            'border': f'1px solid {color}',
+            'fontWeight': 'bold',
+            'color': 'white',
+        },
+        {
+            'if': {'row_index': active_cell['row']},
+            'backgroundColor': color,
+            'border': f'1px solid {color}',
+            'fontWeight': 'bold',
+            'color': 'white',
+        }
+    ]
+
+    return new_store, style
 
 
 @app.callback(
