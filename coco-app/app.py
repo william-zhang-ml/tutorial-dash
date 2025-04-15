@@ -222,6 +222,7 @@ def get_sample(idx: int) -> Tuple[str, List[Dict]]:
         }
         for instance in annots
     ]
+    annots.sort(key=lambda itm: int(itm['Category']))
 
     return img, annots
 
